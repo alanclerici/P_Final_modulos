@@ -1,0 +1,8 @@
+# Ignora la carpeta de pruebas
+pruebas
+
+# Ignora todos los archivos de texto
+*.txt
+
+# Ignora imagenes y demas
+*.png
