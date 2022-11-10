@@ -5,16 +5,21 @@
 #include <Arduino.h>
 #include <IRremoteESP8266.h>
 #include <IRsend.h>
+#include <IRrecv.h>
+#include <IRutils.h>
 
 //------definiciones variables
 #define ID "L00001"   //id del modulo
 #define passwordAP "12345678"   //contraseña del acces point para conexion a wifi
 #define mqtt_server "192.168.0.200"
 const uint16_t kIrLed = 4;  // ESP8266 GPIO pin to use. Recommended: 4 (D2).
+const uint16_t kRecvPin = 14; // ESP8266 GPIO pin to use. Recommended: 14 (D5).
 //----------------------------
-
 IRsend irsend(kIrLed);  // Set the GPIO to be used to sending the message.
 
+IRrecv irrecv(kRecvPin);
+
+decode_results results;
 #define fclk 80000000 //frecuencia del clock
 
 WiFiClient espClient;
@@ -26,7 +31,10 @@ char msg[MSG_BUFFER_SIZE];
 char topico[MSG_BUFFER_SIZE];
 
 int t=0; //para aviso de presencia cada 3 s
-
+int modo_operacion=0;   //para diferenciar el modo deteccion de codigo
+                        //del modo de funcionamiento normal
+int publicar=0;      //si llega el pedido de reconocimiento uso esta flag para habilitar
+char *n_boton="xx",*ant_boton="xx"; 
 void isr_timer(){
   t++;
 }
@@ -39,7 +47,36 @@ void timerinit(){
 
 //callback de recepcion de mensajes mqtt
 void callback(char* topic, byte* payload, unsigned int length) {
-  //irsend.sendNEC(0xE0E0D02F);   //envio el codigo
+  char topico_recibido[TOPIC_BUFFER_SIZE];
+  
+  snprintf (topico_recibido, TOPIC_BUFFER_SIZE, "/mod/%s/comandos", ID);
+  if(!strcmp(topic,topico_recibido)){
+    
+    //payload : normal
+    if((char)payload[0]=='n' && (char)payload[1]=='o' && (char)payload[2]=='r'){
+      Serial.println("vuelvo a normal");
+      modo_operacion=0;
+    }
+    //payload : configuracion
+    if((char)payload[0]=='c' && (char)payload[1]=='o' && (char)payload[2]=='n'){
+      Serial.println("entro a conf");
+      modo_operacion=1;
+    }
+  }
+
+  snprintf (topico_recibido, TOPIC_BUFFER_SIZE, "/mod/%s", ID);
+  if(!strcmp(topic,topico_recibido)){
+    if(modo_operacion){
+      if((char)payload[0]=='b'){
+        //agregar id del boton al string para enviar
+        publicar=1;
+      }
+    } else {
+      long codigo = atoi((char*)payload);
+      Serial.println(codigo);
+      //irsend.sendNEC(0xE0E0D02F);   //envio el codigo
+    }
+  }
 }
 
 void reconnect() {
@@ -48,7 +85,7 @@ void reconnect() {
     if (client.connect(clientId.c_str())) {
       //si logro conectarse
       client.publish("/mod/status", ID);
-      snprintf (topico, TOPIC_BUFFER_SIZE, "/mod/%s", ID);
+      snprintf (topico, TOPIC_BUFFER_SIZE, "/mod/%s/#", ID);
       client.subscribe(topico,1);
     } else {
       //si no logro conectarse se clava 3 seg y vuelve a intentar en el loop
@@ -81,7 +118,7 @@ void setup() {
 
     //---init ledIR
     irsend.begin();
-    
+    irrecv.enableIRIn();  // Start the receiver
 }
 
 void loop() {
@@ -90,6 +127,19 @@ void loop() {
   }
   client.loop();
 
+  if(modo_operacion && publicar){
+    if (irrecv.decode(&results)) {
+      // print() & println() can't handle printing long longs. (uint64_t)
+      serialPrintUint64(results.value, HEX);
+      Serial.println("");
+      irrecv.resume();  // Receive the next value
+      publicar=0;
+      Serial.println("publico");
+    }
+    //publico id_boton+codigo
+    
+  }
+  
   if(t>2){
     //cada 3 segundos publico un aviso de presencia
     client.publish("/status", ID);
