@@ -67,7 +67,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
 void reconnect() {
   while (!client.connected()) {
     String clientId = ID;
-    if (client.connect(clientId.c_str())) {
+    if (client.connect(clientId.c_str(),"modulo","modulo")) {
       //si logro conectarse, publica en el topico de status
       client.publish("/mod/status", ID);
       snprintf (topico, TOPIC_BUFFER_SIZE, "/mod/%s/comandos", ID);
