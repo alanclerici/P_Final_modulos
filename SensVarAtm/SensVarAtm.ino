@@ -27,30 +27,50 @@ char msg[MSG_BUFFER_SIZE];
 #define TOPIC_BUFFER_SIZE  (50)
 char topico[MSG_BUFFER_SIZE];
 
-float temp=0, pres=0, hum=0;  //temperatura, presion y humedad
+float newtemp=0, newpres=0, newhum=0;  //temperatura, presion y humedad
+float anttemp=0, antpres=0, anthum=0;
 int tbmp=0,tdht=0,tadp=0; //tbmp usada para bmp280, tdht para DHT11, tadp para aviso de presencia
 
+float roundPunto5(float num){
+  float aux=num-trunc(num);
+  if (aux<0.33)
+  {
+    return (float)trunc(num);
+  }
+  else if (aux<0.66)
+  {
+    return (float)(trunc(num)+0.5);
+  }
+  else
+  {
+    return (float)(trunc(num)+1);
+  }
+}
+
 void publicTempPres(){
-    temp = bme.readTemperature();
-    pres = bme.readPressure()/100;
-    if(!isnan(temp)){
-      snprintf (msg, MSG_BUFFER_SIZE, "%3.1f", temp);
+    newtemp = roundPunto5(bme.readTemperature());
+    newpres = round(bme.readPressure()/100);
+    if(!isnan(newtemp) && anttemp!=newtemp){
+      snprintf (msg, MSG_BUFFER_SIZE, "%3.1f", newtemp);
       snprintf (topico, TOPIC_BUFFER_SIZE, "/mod/%s/temperatura", ID);
       client.publish(topico, msg,true);
+      anttemp=newtemp;
     }
-    if(!isnan(pres)){
-      snprintf (msg, MSG_BUFFER_SIZE, "%4.2f", pres);
+    if(!isnan(newpres) && antpres!=newpres){
+      snprintf (msg, MSG_BUFFER_SIZE, "%d", (int)newpres);
       snprintf (topico, TOPIC_BUFFER_SIZE, "/mod/%s/presion", ID);
       client.publish(topico, msg,true);
+      antpres=newpres;
     }
 }
 
 void publicHum(){
-  hum = dht.readHumidity();
-    if(!isnan(hum)){
-      snprintf (msg, MSG_BUFFER_SIZE, "%d", (int)hum);
+  newhum = round(dht.readHumidity());
+    if(!isnan(newhum)&& anthum!=newhum){
+      snprintf (msg, MSG_BUFFER_SIZE, "%d", (int)newhum);
       snprintf (topico, TOPIC_BUFFER_SIZE, "/mod/%s/humedad", ID);
       client.publish(topico, msg,true);
+      anthum=newhum;
     }
 }
 
