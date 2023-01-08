@@ -11,7 +11,7 @@
 //------definiciones variables
 #define ID "L00001"   //id del modulo
 #define passwordAP "12345678"   //contraseña del acces point para conexion a wifi
-#define mqtt_server "192.168.0.200"
+
 const uint16_t kIrLed = 4;  // ESP8266 GPIO pin to use. Recommended: 4 (D2).
 const uint16_t kRecvPin = 14; // ESP8266 GPIO pin to use. Recommended: 14 (D5).
 //----------------------------
@@ -30,13 +30,18 @@ char msg[MSG_BUFFER_SIZE];
 #define TOPIC_BUFFER_SIZE  (50)
 char topico[MSG_BUFFER_SIZE];
 
-
 char idboton_config[3];
 
 int t=0; //para aviso de presencia cada 3 s
 int modo_operacion=0;   //para diferenciar el modo deteccion de codigo
                         //del modo de funcionamiento normal
 int publicar=0;      //si llega el pedido de reconocimiento uso esta flag para habilitar
+
+unsigned int localPort = 8888;
+// buffers for receiving and sending data (udp)
+char packetBuffer[UDP_TX_PACKET_MAX_SIZE + 1]; //buffer to hold incoming packet,
+
+WiFiUDP Udp;
 
 void isr_timer(){
   t++;
@@ -99,6 +104,61 @@ void reconnect() {
   }
 }
 
+IPAddress getBroadcastIp(){
+  String mask = WiFi.subnetMask().toString();
+    String ip = WiFi.localIP().toString();
+
+    char ip_arr[15];
+    ip.toCharArray(ip_arr,15);
+    char mask_arr[15];
+    mask.toCharArray(mask_arr,15);
+    int octeto[4];
+    int contip=0,contmask=0;
+    for(int i=0;i<4;i++){
+      String auxip = String(ip_arr[contip]);
+      String auxmask = String(mask_arr[contmask]);
+      while(ip_arr[contip+1]!='.'){
+        auxip=auxip+ip_arr[contip+1];
+        contip++;
+      }
+      contip+=2;
+      while(mask_arr[contmask+1]!='.'){
+        auxmask=auxmask+mask_arr[contmask+1];
+        contmask++;
+      }
+      contmask+=2;
+      octeto[i]=auxip.toInt() & auxmask.toInt() | ~auxmask.toInt();
+    }
+    IPAddress ipred(octeto[0],octeto[1],octeto[2],octeto[3]);
+    //Serial.println(ipred.toString());
+    return ipred;
+}
+
+int listenUdp(){
+  int packetSize = Udp.parsePacket();
+  if (packetSize) {
+    Serial.printf("Received packet of size %d from %s:%d\n    (to %s:%d, free heap = %d B)\n",
+                  packetSize,
+                  Udp.remoteIP().toString().c_str(), Udp.remotePort(),
+                  Udp.destinationIP().toString().c_str(), Udp.localPort(),
+                  ESP.getFreeHeap());
+
+    // read the packet into packetBufffer
+    int n = Udp.read(packetBuffer, UDP_TX_PACKET_MAX_SIZE);
+    packetBuffer[n] = 0;
+    Serial.println("Contents:");
+    Serial.println(packetBuffer);
+    return 0;
+  }
+return 1;
+}
+
+void sendBroadcast(){
+  Udp.beginPacket(getBroadcastIp(), 2222);
+  Udp.write("GetIp");
+  Udp.endPacket();
+}
+
 void setup() {
     Serial.begin(115200);
 
@@ -114,8 +174,23 @@ void setup() {
         Serial.println("connected");
     }
 
+    //udp server init
+    Udp.begin(localPort);
+    int flag=1;
+    long ti=millis();
+    long tf=ti;
+    sendBroadcast();
+    while(flag){
+      tf=millis();
+      if(tf-ti>1000){
+        sendBroadcast();
+        ti=tf;
+      }
+      flag = listenUdp();
+    }
+
     //---init mqtt
-    client.setServer(mqtt_server, 1883);
+    client.setServer(packetBuffer, 1883);
     client.setCallback(callback);
 
     //---init timer
