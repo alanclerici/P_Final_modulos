@@ -65,6 +65,16 @@ void callback(char* topic, byte* payload, unsigned int length) {
     snprintf (topico, TOPIC_BUFFER_SIZE, "/mod/%s/estado", ID);
     client.publish(topico, "off",3);
   }
+  if((char)payload[0] =='t' && (char)payload[1] =='o' && (char)payload[2] =='g'){
+    Serial.println("toggle");
+    digitalWrite(pinrele,!digitalRead(pinrele));
+    snprintf (topico, TOPIC_BUFFER_SIZE, "/mod/%s/estado", ID);
+    if(digitalRead(pinrele)){
+      client.publish(topico, "on",3);
+    } else {
+    client.publish(topico, "off",3);
+    }
+  }
 }
 
 void reconnect() {
