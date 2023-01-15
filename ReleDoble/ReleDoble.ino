@@ -5,11 +5,13 @@
 #include <WiFiUdp.h>  //udp
 
 //------definiciones variables
-#define ID "R00001"   //id del modulo
+#define ID1 "R00003"   //id del modulo
+#define ID2 "R00004"
 #define passwordAP "12345678"   //contraseña del acces point para conexion a wifi
 //----------------------------
 
-#define pinrele D3
+#define pinrele1 4
+#define pinrele2 5
 #define fclk 80000000 //frecuencia del clock
 unsigned int localPort = 8888;
 
@@ -21,7 +23,7 @@ char msg[MSG_BUFFER_SIZE];
 #define TOPIC_BUFFER_SIZE  (50)
 char topico[MSG_BUFFER_SIZE];
 
-int t=0; //para aviso de presencia cada 3 s
+int t=0,pin; //para aviso de presencia cada 3 s. pin para usar en callback
 
 // buffers for receiving and sending data (udp)
 char packetBuffer[UDP_TX_PACKET_MAX_SIZE + 1]; //buffer to hold incoming packet,
@@ -41,13 +43,19 @@ void timerinit(){
 //callback de recepcion de mensajes mqtt
 void callback(char* topic, byte* payload, unsigned int length) {
 
-  snprintf (topico, TOPIC_BUFFER_SIZE, "%s", (char*)payload);
-  Serial.println(topico);
+  snprintf (topico, TOPIC_BUFFER_SIZE, "/mod/%s/comandos", ID1);
+  if(!strcmp(topic,topico)){
+    snprintf (topico, TOPIC_BUFFER_SIZE, "/mod/%s/estado", ID1);
+    pin=pinrele1;
+  } else {
+    snprintf (topico, TOPIC_BUFFER_SIZE, "/mod/%s/estado", ID2);
+    pin=pinrele2;
+  }
 
   if((char)payload[0] =='g' && (char)payload[1] =='e' && (char)payload[2] =='t'){
     Serial.println("get");
-    snprintf (topico, TOPIC_BUFFER_SIZE, "/mod/%s/estado", ID);
-    if(digitalRead(pinrele)){
+    //snprintf (topico, TOPIC_BUFFER_SIZE, "/mod/%s/estado", ID1);
+    if(digitalRead(pin)){
       client.publish(topico, "on",2);   //el segundo parametro es lalongitud del msg
     } else {
       client.publish(topico, "off",3);
@@ -55,21 +63,21 @@ void callback(char* topic, byte* payload, unsigned int length) {
   }
   if((char)payload[0] =='o' && (char)payload[1] =='n'){
     Serial.println("on");
-    digitalWrite(pinrele,HIGH);
-    snprintf (topico, TOPIC_BUFFER_SIZE, "/mod/%s/estado", ID);
+    digitalWrite(pin,HIGH);
+    //snprintf (topico, TOPIC_BUFFER_SIZE, "/mod/%s/estado", ID1);
     client.publish(topico, "on",2);
   }
   if((char)payload[0] =='o' && (char)payload[1] =='f' && (char)payload[2] =='f'){
     Serial.println("off");
-    digitalWrite(pinrele,LOW);
-    snprintf (topico, TOPIC_BUFFER_SIZE, "/mod/%s/estado", ID);
+    digitalWrite(pin,LOW);
+    //snprintf (topico, TOPIC_BUFFER_SIZE, "/mod/%s/estado", ID1);
     client.publish(topico, "off",3);
   }
   if((char)payload[0] =='t' && (char)payload[1] =='o' && (char)payload[2] =='g'){
     Serial.println("toggle");
-    digitalWrite(pinrele,!digitalRead(pinrele));
-    snprintf (topico, TOPIC_BUFFER_SIZE, "/mod/%s/estado", ID);
-    if(digitalRead(pinrele)){
+    digitalWrite(pin,!digitalRead(pin));
+    //snprintf (topico, TOPIC_BUFFER_SIZE, "/mod/%s/estado", ID1);
+    if(digitalRead(pin)){
       client.publish(topico, "on",3);
     } else {
     client.publish(topico, "off",3);
@@ -79,13 +87,13 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
 void reconnect() {
   while (!client.connected()) {
-    String clientId = ID;
+    String clientId = ID1;
     if (client.connect(clientId.c_str(),"modulo","modulo")) {
       //si logro conectarse
-      client.publish("/mod/status", ID);
-      snprintf (topico, TOPIC_BUFFER_SIZE, "/mod/%s/comandos", ID);
+      snprintf (topico, TOPIC_BUFFER_SIZE, "/mod/%s/comandos", ID1);
       client.subscribe(topico,1);
-      
+      snprintf (topico, TOPIC_BUFFER_SIZE, "/mod/%s/comandos", ID2);
+      client.subscribe(topico,1);
     } else {
       //si no logro conectarse se clava 3 seg y vuelve a intentar en el loop
       delay(3000);
@@ -152,13 +160,15 @@ void setup() {
     Serial.begin(115200);
 
     //---init gpio
-    pinMode(pinrele,OUTPUT);
-    digitalWrite(pinrele,LOW);
+    pinMode(pinrele1,OUTPUT);
+    digitalWrite(pinrele1,LOW);
+    pinMode(pinrele2,OUTPUT);
+    digitalWrite(pinrele2,LOW);
 
     //---wifi manager
     WiFiManager wm;
     bool res;
-    res = wm.autoConnect(ID,passwordAP); // password protected ap. Bloqueante
+    res = wm.autoConnect(ID1,passwordAP); // password protected ap. Bloqueante
     if(!res) {
         Serial.println("Failed to connect");
         // ESP.restart();
@@ -199,7 +209,8 @@ void loop() {
 
   if(t>2){
     //cada 3 segundos publico un aviso de presencia
-    client.publish("/status", ID);
+    client.publish("/status", ID1);
+    client.publish("/status", ID2);
     t=0;
   } 
 }
