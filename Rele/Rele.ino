@@ -9,7 +9,8 @@
 #define passwordAP "12345678"   //contraseña del acces point para conexion a wifi
 //----------------------------
 
-#define pinrele D3
+#define pinsw D1
+#define pinrele 2
 #define fclk 80000000 //frecuencia del clock
 unsigned int localPort = 8888;
 
@@ -21,15 +22,19 @@ char msg[MSG_BUFFER_SIZE];
 #define TOPIC_BUFFER_SIZE  (50)
 char topico[MSG_BUFFER_SIZE];
 
-int t=0; //para aviso de presencia cada 3 s
+int t=0,tresetwifi=0; //para aviso de presencia cada 3 s
 
 // buffers for receiving and sending data (udp)
 char packetBuffer[UDP_TX_PACKET_MAX_SIZE + 1]; //buffer to hold incoming packet,
 
 WiFiUDP Udp;
 
+//---wifi manager
+WiFiManager wm;
+
 void isr_timer(){
   t++;
+  tresetwifi++;
 }
 
 void timerinit(){
@@ -155,8 +160,11 @@ void setup() {
     pinMode(pinrele,OUTPUT);
     digitalWrite(pinrele,LOW);
 
-    //---wifi manager
-    WiFiManager wm;
+    pinMode(pinsw,INPUT);
+    Serial.println();
+    Serial.print("UOOOCA: ");
+    Serial.println(digitalRead(pinsw));
+
     bool res;
     res = wm.autoConnect(ID,passwordAP); // password protected ap. Bloqueante
     if(!res) {
@@ -201,5 +209,16 @@ void loop() {
     //cada 3 segundos publico un aviso de presencia
     client.publish("/status", ID);
     t=0;
-  } 
+  }
+
+  //reset conexion wifi
+  if(!digitalRead(pinsw)){
+    if(tresetwifi>3){
+      wm.resetSettings();
+      Serial.println("reseteao");
+      //ESP.restart();
+    }
+  } else {
+    tresetwifi=0;
+  }
 }
