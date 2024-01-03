@@ -5,12 +5,12 @@
 #include <WiFiUdp.h>  //udp
 
 //------definiciones variables
-#define ID "R00001"   //id del modulo
+#define ID "R00004"   //id del modulo
 #define passwordAP "12345678"   //contraseña del acces point para conexion a wifi
 //----------------------------
 
-#define pinsw D1
-#define pinrele 2
+#define pinsw 2
+#define pinrele 0
 #define fclk 80000000 //frecuencia del clock
 unsigned int localPort = 8888;
 
@@ -166,10 +166,11 @@ void setup() {
     Serial.println(digitalRead(pinsw));
 
     bool res;
+    wm.setConfigPortalTimeout(45);
     res = wm.autoConnect(ID,passwordAP); // password protected ap. Bloqueante
     if(!res) {
         Serial.println("Failed to connect");
-        // ESP.restart();
+        ESP.restart();
     } 
     else {   
         Serial.println("connected");
@@ -196,7 +197,8 @@ void setup() {
 
     //---init timer
     timerinit();
-    
+
+    //wm.resetSettings();
 }
 
 void loop() {
@@ -216,7 +218,7 @@ void loop() {
     if(tresetwifi>3){
       wm.resetSettings();
       Serial.println("reseteao");
-      //ESP.restart();
+      ESP.restart();
     }
   } else {
     tresetwifi=0;

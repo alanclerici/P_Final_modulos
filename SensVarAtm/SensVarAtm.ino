@@ -7,6 +7,8 @@
 #include <string.h>
 #include "DHT.h"
 
+
+#define pinsw D7
 //------definiciones variables
 #define ID "S00001"   //id del modulo
 #define passwordAP "12345678"   //contraseña del acces point para conexion a wifi
@@ -35,7 +37,10 @@ char topico[MSG_BUFFER_SIZE];
 
 float newtemp=0, newpres=0, newhum=0;  //temperatura, presion y humedad
 float anttemp=0, antpres=0, anthum=0;
-int tbmp=0,tdht=0,tadp=0; //tbmp usada para bmp280, tdht para DHT11, tadp para aviso de presencia
+int tbmp=0,tdht=0,tadp=0,tresetwifi=0;; //tbmp usada para bmp280, tdht para DHT11, tadp para aviso de presencia
+
+//---wifi manager
+WiFiManager wm;
 
 float roundPunto5(float num){
   float aux=num-trunc(num);
@@ -109,6 +114,7 @@ void isr_timer(){
   tbmp++;
   tdht++;
   tadp++;
+  tresetwifi++;
 }
 
 void timerinit(){
@@ -178,10 +184,11 @@ void setup() {
     //---wifi manager
     WiFiManager wm;
     bool res;
+    wm.setConfigPortalTimeout(45);
     res = wm.autoConnect(ID,passwordAP); // password protected ap
     if(!res) {
         Serial.println("Failed to connect");
-        // ESP.restart();
+        ESP.restart();
     } 
     else {   
         Serial.println("connected");
@@ -240,4 +247,17 @@ void loop() {
     client.publish("/status", ID);
     tadp=0;
   }
+
+  /*
+  //reset conexion wifi
+  if(!digitalRead(pinsw)){
+    if(tresetwifi>3){
+      wm.resetSettings();
+      Serial.println("reseteao");
+      //ESP.restart();
+    }
+  } else {
+    tresetwifi=0;
+  }
+  */
 }

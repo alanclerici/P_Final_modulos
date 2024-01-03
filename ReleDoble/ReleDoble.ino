@@ -5,8 +5,8 @@
 #include <WiFiUdp.h>  //udp
 
 //------definiciones variables
-#define ID1 "R00003"   //id del modulo
-#define ID2 "R00004"
+#define ID1 "R00001"   //id del modulo
+#define ID2 "R00002"
 #define passwordAP "12345678"   //contraseña del acces point para conexion a wifi
 //----------------------------
 
@@ -168,10 +168,12 @@ void setup() {
     //---wifi manager
     WiFiManager wm;
     bool res;
+    //wm.resetSettings();
+    wm.setConfigPortalTimeout(45);
     res = wm.autoConnect(ID1,passwordAP); // password protected ap. Bloqueante
     if(!res) {
         Serial.println("Failed to connect");
-        // ESP.restart();
+        ESP.restart();
     } 
     else {   
         Serial.println("connected");

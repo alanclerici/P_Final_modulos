@@ -43,6 +43,24 @@ char packetBuffer[UDP_TX_PACKET_MAX_SIZE + 1]; //buffer to hold incoming packet,
 
 WiFiUDP Udp;
 
+unsigned long int bytesToULong(byte *byteArray, size_t size) {
+  // Asegurarse de que el tamaño del arreglo no sea mayor que el tamaño del tipo de dato de destino
+  if (size > sizeof(unsigned long int)) {
+    size = sizeof(unsigned long int);
+  }
+
+  // Inicializar el resultado como cero
+  unsigned long int result = 0;
+
+  // Recorrer el arreglo de bytes y construir el número entero sin signo
+  for (size_t i = 0; i < size; i++) {
+    // Desplazar los bits a la izquierda y realizar una operación OR bit a bit
+    result |= (static_cast<unsigned long int>(byteArray[i]) << (8 * (size - 1 - i)));
+  }
+
+  return result;
+}
+
 void isr_timer(){
   t++;
 }
@@ -82,9 +100,16 @@ void callback(char* topic, byte* payload, unsigned int length) {
         irrecv.resume();  // Receive the next value
       }
     } else {
-      unsigned long codigo = strtoul((char*)payload,NULL,0);
+      
+      char auxiliar[length+1];
+      // Copiar los primeros 8 caracteres de la cadena de origen a la cadena de destino
+      strncpy(auxiliar, (char*)payload, length);
+      auxiliar[length] = '\0';
+      unsigned long codigo = strtoul(auxiliar,NULL,10);
       Serial.println(codigo);
       irsend.sendNEC(codigo);   //envio el codigo
+      delay(20);
+      
     }
   }
 }
@@ -165,10 +190,12 @@ void setup() {
     //---wifi manager
     WiFiManager wm;
     bool res;
+    wm.setConfigPortalTimeout(45);
     res = wm.autoConnect(ID,passwordAP); // password protected ap
+    
     if(!res) {
         Serial.println("Failed to connect");
-        // ESP.restart();
+        ESP.restart();
     } 
     else {   
         Serial.println("connected");
